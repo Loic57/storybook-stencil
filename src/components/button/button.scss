@@ -1,0 +1,38 @@
+@import 'mapping';
+
+:host {
+  display: block;
+  color: var(--primary-90);
+  font-size: 1.6rem;
+  font-family: var(--font-1);
+  padding: 1.6rem 2.4rem;
+  cursor: pointer;
+  font-weight: 600;
+  border-radius: 10rem;
+  display: inline-flex;
+  position: relative;
+  transition: 0.2s;
+  outline: 0;
+
+  @each $key, $value in $button-colors {
+    &:host([color="#{$key}"]) {
+      color: map-deep-get($value, 'color');
+      background-color: map-deep-get($value, 'background-color');
+      border-color: map-deep-get($value, 'border-color');
+
+      @media(hover: hover) {
+        &:host(:hover) {
+          color: map-deep-get($value, 'hover', 'color');
+          background-color: map-deep-get($value, 'hover', 'background-color');
+          border-color: map-deep-get($value, 'hover', 'border-color');
+        }
+
+        &:host(:focus) {
+          color: map-deep-get($value, 'focus', 'color');
+          background-color: map-deep-get($value, 'focus', 'background-color');
+          border-color: map-deep-get($value, 'focus', 'border-color');
+        }
+      }
+    }
+  }
+}

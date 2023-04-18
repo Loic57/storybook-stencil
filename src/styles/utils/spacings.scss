@@ -1,0 +1,65 @@
+$sm: 576px;
+$md: 768px;
+$lg: 992px;
+$xl: 1200px;
+$xxl: 1400px;
+
+
+@for $multiplicator from 0 through 20 {
+
+  $result: 8 * $multiplicator;
+
+  .mt--#{$result}, :host([mt--#{$result}]) { margin-top: 0.4rem * $multiplicator!important; }
+  .mr--#{$result}, :host([mr--#{$result}]) { margin-right: 0.4rem * $multiplicator!important; }
+  .mb--#{$result}, :host([mb--#{$result}]) { margin-bottom: 0.4rem * $multiplicator!important; }
+  .ml--#{$result}, :host([ml--#{$result}]) { margin-left: 0.4rem * $multiplicator!important; }
+}
+
+
+@media(min-width: $sm) {
+  @for $multiplicator from 0 through 20 {
+
+    $result: 8 * $multiplicator;
+
+    .mt--#{$sm}--#{$result}, :host([mt--#{$sm}--#{$result}]) { margin-top: 0.4rem * $multiplicator!important; }
+    .mr--#{$sm}--#{$result}, :host([mt--#{$sm}--#{$result}]) { margin-right: 0.4rem * $multiplicator!important; }
+    .mb--#{$sm}--#{$result}, :host([mt--#{$sm}--#{$result}]) { margin-bottom: 0.4rem * $multiplicator!important; }
+    .ml--#{$sm}--#{$result}, :host([mt--#{$sm}--#{$result}]) { margin-left: 0.4rem * $multiplicator!important; }
+  }
+}
+
+
+@media(min-width: $md) {
+  @for $multiplicator from 0 through 20 {
+    $result: 8 * $multiplicator;
+
+    .mt--#{$md}--#{$result}, :host([mt--#{$md}--#{$result}]) { margin-top: 0.4rem * $multiplicator!important; }
+    .mr--#{$md}--#{$result}, :host([mt--#{$md}--#{$result}]) { margin-right: 0.4rem * $multiplicator!important; }
+    .mb--#{$md}--#{$result}, :host([mt--#{$md}--#{$result}]) { margin-bottom: 0.4rem * $multiplicator!important; }
+    .ml--#{$md}--#{$result}, :host([mt--#{$md}--#{$result}]) { margin-left: 0.4rem * $multiplicator!important; }
+  }
+}
+
+
+@media(min-width: $lg) {
+  @for $multiplicator from 0 through 20 {
+    $result: 8 * $multiplicator;
+
+    .mt--#{$lg}--#{$result}, :host([mt--#{$lg}--#{$result}]) { margin-top: 0.4rem * $multiplicator!important; }
+    .mr--#{$lg}--#{$result}, :host([mt--#{$lg}--#{$result}]) { margin-right: 0.4rem * $multiplicator!important; }
+    .mb--#{$lg}--#{$result}, :host([mt--#{$lg}--#{$result}]) { margin-bottom: 0.4rem * $multiplicator!important; }
+    .ml--#{$lg}--#{$result}, :host([mt--#{$lg}--#{$result}]) { margin-left: 0.4rem * $multiplicator!important; }
+  }
+}
+
+
+@media(min-width: $xl) {
+  @for $multiplicator from 0 through 20 {
+    $result: 8 * $multiplicator;
+
+    .mt--#{$xl}--#{$result}, :host([mt--#{$xl}--#{$result}]) { margin-top: 0.4rem * $multiplicator!important; }
+    .mr--#{$xl}--#{$result}, :host([mt--#{$xl}--#{$result}]) { margin-right: 0.4rem * $multiplicator!important; }
+    .mb--#{$xl}--#{$result}, :host([mt--#{$xl}--#{$result}]) { margin-bottom: 0.4rem * $multiplicator!important; }
+    .ml--#{$xl}--#{$result}, :host([mt--#{$xl}--#{$result}]) { margin-left: 0.4rem * $multiplicator!important; }
+  }
+}
