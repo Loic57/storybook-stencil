@@ -1,4 +1,4 @@
-import { h, Host } from '@stencil/core';
+import { h, Host } from "@stencil/core";
 export class APButton {
   constructor() {
     this.type = 'button';

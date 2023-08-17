@@ -237,9 +237,9 @@ const registerStyle = (scopeId, cssText, allowCS) => {
     }
     styles.set(scopeId, style);
 };
-const addStyle = (styleContainerNode, cmpMeta, mode, hostElm) => {
+const addStyle = (styleContainerNode, cmpMeta, mode) => {
     var _a;
-    let scopeId = getScopeId(cmpMeta);
+    const scopeId = getScopeId(cmpMeta);
     const style = styles.get(scopeId);
     // if an element is NOT connected then getRootNode() will return the wrong root node
     // so the fallback is to always use the document for the root node in those cases
@@ -254,11 +254,8 @@ const addStyle = (styleContainerNode, cmpMeta, mode, hostElm) => {
             }
             if (!appliedStyles.has(scopeId)) {
                 {
-                    // TODO(STENCIL-659): Remove code implementing the CSS variable shim
-                    {
-                        styleElm = doc.createElement('style');
-                        styleElm.innerHTML = style;
-                    }
+                    styleElm = doc.createElement('style');
+                    styleElm.innerHTML = style;
                     // Apply CSP nonce to the style tag if it exists
                     const nonce = (_a = plt.$nonce$) !== null && _a !== void 0 ? _a : queryNonceMetaTagContent(doc);
                     if (nonce != null) {
@@ -283,7 +280,6 @@ const attachStyles = (hostRef) => {
     const flags = cmpMeta.$flags$;
     const endAttachStyles = createTime('attachStyles', cmpMeta.$tagName$);
     const scopeId = addStyle(elm.shadowRoot ? elm.shadowRoot : elm.getRootNode(), cmpMeta);
-    // TODO(STENCIL-662): Remove code related to deprecated shadowDomShim field
     if (flags & 10 /* CMP_FLAGS.needsScopedEncapsulation */) {
         // only required when we're NOT using native shadow dom (slot)
         // or this browser doesn't support native shadow dom
@@ -305,6 +301,21 @@ const getScopeId = (cmp, mode) => 'sc-' + (cmp.$tagName$);
  * https://github.com/developit/preact/blob/master/LICENSE
  *
  * Modified for Stencil's compiler and vdom
+ */
+/**
+ * When running a VDom render set properties present on a VDom node onto the
+ * corresponding HTML element.
+ *
+ * Note that this function has special functionality for the `class`,
+ * `style`, `key`, and `ref` attributes, as well as event handlers (like
+ * `onClick`, etc). All others are just passed through as-is.
+ *
+ * @param elm the HTMLElement onto which attributes should be set
+ * @param memberName the name of the attribute to set
+ * @param oldValue the old value for the attribute
+ * @param newValue the new value for the attribute
+ * @param isSvg whether we're in an svg context or not
+ * @param flags bitflags for Vdom variables
  */
 const setAccessor = (elm, memberName, oldValue, newValue, isSvg, flags) => {
     if (oldValue !== newValue) {
@@ -495,15 +506,16 @@ const addVnodes = (parentElm, before, parentVNode, vnodes, startIdx, endIdx) => 
  * @param vnodes a list of virtual DOM nodes to remove
  * @param startIdx the index at which to start removing nodes (inclusive)
  * @param endIdx the index at which to stop removing nodes (inclusive)
- * @param vnode a VNode
- * @param elm an element
  */
-const removeVnodes = (vnodes, startIdx, endIdx, vnode, elm) => {
-    for (; startIdx <= endIdx; ++startIdx) {
-        if ((vnode = vnodes[startIdx])) {
-            elm = vnode.$elm$;
-            // remove the vnode's element from the dom
-            elm.remove();
+const removeVnodes = (vnodes, startIdx, endIdx) => {
+    for (let index = startIdx; index <= endIdx; ++index) {
+        const vnode = vnodes[index];
+        if (vnode) {
+            const elm = vnode.$elm$;
+            if (elm) {
+                // remove the vnode's element from the dom
+                elm.remove();
+            }
         }
     }
 };
@@ -762,12 +774,39 @@ const patch = (oldVNode, newVNode) => {
  * @param hostRef data needed to root and render the virtual DOM tree, such as
  * the DOM node into which it should be rendered.
  * @param renderFnResults the virtual DOM nodes to be rendered
+ * @param isInitialLoad whether or not this is the first call after page load
  */
-const renderVdom = (hostRef, renderFnResults) => {
+const renderVdom = (hostRef, renderFnResults, isInitialLoad = false) => {
     const hostElm = hostRef.$hostElement$;
     const oldVNode = hostRef.$vnode$ || newVNode(null, null);
+    // if `renderFnResults` is a Host node then we can use it directly. If not,
+    // we need to call `h` again to wrap the children of our component in a
+    // 'dummy' Host node (well, an empty vnode) since `renderVdom` assumes
+    // implicitly that the top-level vdom node is 1) an only child and 2)
+    // contains attrs that need to be set on the host element.
     const rootVnode = isHost(renderFnResults) ? renderFnResults : h(null, null, renderFnResults);
     hostTagName = hostElm.tagName;
+    // On the first render and *only* on the first render we want to check for
+    // any attributes set on the host element which are also set on the vdom
+    // node. If we find them, we override the value on the VDom node attrs with
+    // the value from the host element, which allows developers building apps
+    // with Stencil components to override e.g. the `role` attribute on a
+    // component even if it's already set on the `Host`.
+    if (isInitialLoad && rootVnode.$attrs$) {
+        for (const key of Object.keys(rootVnode.$attrs$)) {
+            // We have a special implementation in `setAccessor` for `style` and
+            // `class` which reconciles values coming from the VDom with values
+            // already present on the DOM element, so we don't want to override those
+            // attributes on the VDom tree with values from the host element if they
+            // are present.
+            //
+            // Likewise, `ref` and `key` are special internal values for the Stencil
+            // runtime and we don't want to override those either.
+            if (hostElm.hasAttribute(key) && !['key', 'ref', 'style', 'class'].includes(key)) {
+                rootVnode.$attrs$[key] = hostElm[key];
+            }
+        }
+    }
     rootVnode.$tag$ = null;
     rootVnode.$flags$ |= 4 /* VNODE_FLAGS.isHost */;
     hostRef.$vnode$ = rootVnode;
@@ -798,15 +837,76 @@ const scheduleUpdate = (hostRef, isInitialLoad) => {
     const dispatch = () => dispatchHooks(hostRef, isInitialLoad);
     return writeTask(dispatch) ;
 };
+/**
+ * Dispatch initial-render and update lifecycle hooks, enqueuing calls to
+ * component lifecycle methods like `componentWillLoad` as well as
+ * {@link updateComponent}, which will kick off the virtual DOM re-render.
+ *
+ * @param hostRef a reference to a host DOM node
+ * @param isInitialLoad whether we're on the initial load or not
+ * @returns an empty Promise which is used to enqueue a series of operations for
+ * the component
+ */
 const dispatchHooks = (hostRef, isInitialLoad) => {
     const endSchedule = createTime('scheduleUpdate', hostRef.$cmpMeta$.$tagName$);
     const instance = hostRef.$lazyInstance$ ;
-    let promise;
+    // We're going to use this variable together with `enqueue` to implement a
+    // little promise-based queue. We start out with it `undefined`. When we add
+    // the first function to the queue we'll set this variable to be that
+    // function's return value. When we attempt to add subsequent values to the
+    // queue we'll check that value and, if it was a `Promise`, we'll then chain
+    // the new function off of that `Promise` using `.then()`. This will give our
+    // queue two nice properties:
+    //
+    // 1. If all functions added to the queue are synchronous they'll be called
+    //    synchronously right away.
+    // 2. If all functions added to the queue are asynchronous they'll all be
+    //    called in order after `dispatchHooks` exits.
+    let maybePromise;
     endSchedule();
-    return then(promise, () => updateComponent(hostRef, instance, isInitialLoad));
+    return enqueue(maybePromise, () => updateComponent(hostRef, instance, isInitialLoad));
 };
+/**
+ * This function uses a Promise to implement a simple first-in, first-out queue
+ * of functions to be called.
+ *
+ * The queue is ordered on the basis of the first argument. If it's
+ * `undefined`, then nothing is on the queue yet, so the provided function can
+ * be called synchronously (although note that this function may return a
+ * `Promise`). The idea is that then the return value of that enqueueing
+ * operation is kept around, so that if it was a `Promise` then subsequent
+ * functions can be enqueued by calling this function again with that `Promise`
+ * as the first argument.
+ *
+ * @param maybePromise either a `Promise` which should resolve before the next function is called or an 'empty' sentinel
+ * @param fn a function to enqueue
+ * @returns either a `Promise` or the return value of the provided function
+ */
+const enqueue = (maybePromise, fn) => isPromisey(maybePromise) ? maybePromise.then(fn) : fn();
+/**
+ * Check that a value is a `Promise`. To check, we first see if the value is an
+ * instance of the `Promise` global. In a few circumstances, in particular if
+ * the global has been overwritten, this is could be misleading, so we also do
+ * a little 'duck typing' check to see if the `.then` property of the value is
+ * defined and a function.
+ *
+ * @param maybePromise it might be a promise!
+ * @returns whether it is or not
+ */
+const isPromisey = (maybePromise) => maybePromise instanceof Promise ||
+    (maybePromise && maybePromise.then && typeof maybePromise.then === 'function');
+/**
+ * Update a component given reference to its host elements and so on.
+ *
+ * @param hostRef an object containing references to the element's host node,
+ * VDom nodes, and other metadata
+ * @param instance a reference to the underlying host element where it will be
+ * rendered
+ * @param isInitialLoad whether or not this function is being called as part of
+ * the first render cycle
+ */
 const updateComponent = async (hostRef, instance, isInitialLoad) => {
-    // updateComponent
+    var _a;
     const elm = hostRef.$hostElement$;
     const endUpdate = createTime('update', hostRef.$cmpMeta$.$tagName$);
     const rc = elm['s-rc'];
@@ -816,7 +916,7 @@ const updateComponent = async (hostRef, instance, isInitialLoad) => {
     }
     const endRender = createTime('render', hostRef.$cmpMeta$.$tagName$);
     {
-        callRender(hostRef, instance);
+        callRender(hostRef, instance, elm, isInitialLoad);
     }
     if (rc) {
         // ok, so turns out there are some child host elements
@@ -828,7 +928,7 @@ const updateComponent = async (hostRef, instance, isInitialLoad) => {
     endRender();
     endUpdate();
     {
-        const childrenPromises = elm['s-p'];
+        const childrenPromises = (_a = elm['s-p']) !== null && _a !== void 0 ? _a : [];
         const postUpdate = () => postUpdateComponent(hostRef);
         if (childrenPromises.length === 0) {
             postUpdate();
@@ -840,7 +940,19 @@ const updateComponent = async (hostRef, instance, isInitialLoad) => {
         }
     }
 };
-const callRender = (hostRef, instance, elm) => {
+/**
+ * Handle making the call to the VDom renderer with the proper context given
+ * various build variables
+ *
+ * @param hostRef an object containing references to the element's host node,
+ * VDom nodes, and other metadata
+ * @param instance a reference to the underlying host element where it will be
+ * rendered
+ * @param elm the Host element for the component
+ * @param isInitialLoad whether or not this function is being called as part of
+ * @returns an empty promise
+ */
+const callRender = (hostRef, instance, elm, isInitialLoad) => {
     try {
         instance = instance.render() ;
         {
@@ -855,7 +967,7 @@ const callRender = (hostRef, instance, elm) => {
                 // or we need to update the css class/attrs on the host element
                 // DOM WRITE!
                 {
-                    renderVdom(hostRef, instance);
+                    renderVdom(hostRef, instance, isInitialLoad);
                 }
             }
         }
@@ -910,9 +1022,6 @@ const appDidLoad = (who) => {
         addHydratedFlag(doc.documentElement);
     }
     nextTick(() => emitEvent(win, 'appload', { detail: { namespace: NAMESPACE } }));
-};
-const then = (promise, thenFn) => {
-    return promise && promise.then ? promise.then(thenFn) : thenFn();
 };
 const addHydratedFlag = (elm) => elm.classList.add('hydrated')
     ;
@@ -1044,9 +1153,9 @@ const proxyComponent = (Cstr, cmpMeta, flags) => {
 const initializeComponent = async (elm, hostRef, cmpMeta, hmrVersionId, Cstr) => {
     // initializeComponent
     if ((hostRef.$flags$ & 32 /* HOST_FLAGS.hasInitializedComponent */) === 0) {
+        // Let the runtime know that the component has been initialized
+        hostRef.$flags$ |= 32 /* HOST_FLAGS.hasInitializedComponent */;
         {
-            // we haven't initialized this element yet
-            hostRef.$flags$ |= 32 /* HOST_FLAGS.hasInitializedComponent */;
             // lazy loaded components
             // request the component's implementation to be
             // wired up with the host element
@@ -1110,6 +1219,8 @@ const initializeComponent = async (elm, hostRef, cmpMeta, hmrVersionId, Cstr) =>
         schedule();
     }
 };
+const fireConnectedCallback = (instance) => {
+};
 const connectedCallback = (elm) => {
     if ((plt.$flags$ & 1 /* PLATFORM_FLAGS.isTmpDisconnected */) === 0) {
         const hostRef = getHostRef(elm);
@@ -1148,12 +1259,25 @@ const connectedCallback = (elm) => {
                 initializeComponent(elm, hostRef, cmpMeta);
             }
         }
+        else {
+            // fire off connectedCallback() on component instance
+            if (hostRef === null || hostRef === void 0 ? void 0 : hostRef.$lazyInstance$) ;
+            else if (hostRef === null || hostRef === void 0 ? void 0 : hostRef.$onReadyPromise$) {
+                hostRef.$onReadyPromise$.then(() => fireConnectedCallback());
+            }
+        }
         endConnected();
     }
 };
-const disconnectedCallback = (elm) => {
+const disconnectInstance = (instance) => {
+};
+const disconnectedCallback = async (elm) => {
     if ((plt.$flags$ & 1 /* PLATFORM_FLAGS.isTmpDisconnected */) === 0) {
-        getHostRef(elm);
+        const hostRef = getHostRef(elm);
+        if (hostRef === null || hostRef === void 0 ? void 0 : hostRef.$lazyInstance$) ;
+        else if (hostRef === null || hostRef === void 0 ? void 0 : hostRef.$onReadyPromise$) {
+            hostRef.$onReadyPromise$.then(() => disconnectInstance());
+        }
     }
 };
 const bootstrapLazy = (lazyBundles, options = {}) => {
@@ -1373,4 +1497,4 @@ exports.promiseResolve = promiseResolve;
 exports.registerInstance = registerInstance;
 exports.setNonce = setNonce;
 
-//# sourceMappingURL=index-9202a0ac.js.map
+//# sourceMappingURL=index-e6de47e0.js.map

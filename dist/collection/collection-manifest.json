@@ -1,11 +1,11 @@
 {
   "entries": [
-    "./components/button/button.js"
+    "components/button/button.js"
   ],
   "compiler": {
     "name": "@stencil/core",
-    "version": "3.0.1",
-    "typescriptVersion": "4.9.5"
+    "version": "4.0.5",
+    "typescriptVersion": "5.0.4"
   },
   "collections": [],
   "bundles": []

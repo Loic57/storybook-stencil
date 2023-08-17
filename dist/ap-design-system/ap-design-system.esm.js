@@ -1,2 +1,2 @@
-import{p as o,b as t}from"./p-c019967f.js";export{s as setNonce}from"./p-c019967f.js";const n=()=>{const t=import.meta.url;const s={};if(t!==""){s.resourcesUrl=new URL(".",t).href}return o(s)};n().then((o=>t([["p-366beb4a",[[1,"ap-button",{type:[1],content:[1],color:[1]}]]]],o)));
+import{p as t,b as o}from"./p-dcc96227.js";export{s as setNonce}from"./p-dcc96227.js";const c=()=>{const o=import.meta.url;const c={};if(o!==""){c.resourcesUrl=new URL(".",o).href}return t(c)};c().then((t=>o([["p-14f4e2e1",[[1,"ap-button",{type:[1],content:[1],color:[1]}]]]],t)));
 //# sourceMappingURL=ap-design-system.esm.js.map

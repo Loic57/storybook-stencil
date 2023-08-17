@@ -2,20 +2,11 @@
 
 Object.defineProperty(exports, '__esModule', { value: true });
 
-const index = require('./index-9202a0ac.js');
-
-/*
- Stencil Client Patch Esm v3.0.1 | MIT Licensed | https://stenciljs.com
- */
-const patchEsm = () => {
-    return index.promiseResolve();
-};
+const index = require('./index-e6de47e0.js');
 
 const defineCustomElements = (win, options) => {
-  if (typeof window === 'undefined') return Promise.resolve();
-  return patchEsm().then(() => {
+  if (typeof window === 'undefined') return undefined;
   return index.bootstrapLazy([["ap-button.cjs",[[1,"ap-button",{"type":[1],"content":[1],"color":[1]}]]]], options);
-  });
 };
 
 exports.setNonce = index.setNonce;
